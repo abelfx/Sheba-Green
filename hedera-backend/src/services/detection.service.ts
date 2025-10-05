@@ -26,7 +26,7 @@ export class DetectionService {
     try {
       const formData = new FormData();
       const fileStream = fs.createReadStream(imagePath);
-      formData.append('image', fileStream);
+      formData.append('file', fileStream);
 
       const response = await firstValueFrom(
         this.httpService.post(
@@ -56,7 +56,7 @@ export class DetectionService {
     try {
       const formData = new FormData();
       const fileStream = fs.createReadStream(imagePath);
-      formData.append('image', fileStream);
+      formData.append('file', fileStream);
       formData.append('prompt', prompt);
 
       const response = await firstValueFrom(
