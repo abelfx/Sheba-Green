@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@hashgraph/sdk": "^2.74.0",
+    "@nestjs/cli": "^10.0.0",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
