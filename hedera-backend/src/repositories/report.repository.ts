@@ -30,4 +30,27 @@ export class ReportRepository {
   async findByUserId(userId: string): Promise<Report[]> {
     return this.reportModel.find({ userId }).exec();
   }
+
+  async findMany(
+    query: any,
+    options?: { skip?: number; limit?: number; sort?: any },
+  ): Promise<Report[]> {
+    let queryBuilder = this.reportModel.find(query);
+
+    if (options?.sort) {
+      queryBuilder = queryBuilder.sort(options.sort);
+    }
+    if (options?.skip) {
+      queryBuilder = queryBuilder.skip(options.skip);
+    }
+    if (options?.limit) {
+      queryBuilder = queryBuilder.limit(options.limit);
+    }
+
+    return queryBuilder.exec();
+  }
+
+  async count(query: any): Promise<number> {
+    return this.reportModel.countDocuments(query).exec();
+  }
 }

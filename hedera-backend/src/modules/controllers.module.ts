@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import {
   ReportsController,
   VerificationsController,
@@ -8,6 +9,9 @@ import {
   HcsController,
   HealthController,
 } from '../controllers';
+import { FeedController } from '../controllers/feed.controller';
+import { LeaderboardController } from '../controllers/leaderboard.controller';
+import { StatisticsController } from '../controllers/statistics.controller';
 import { UseCasesModule } from './use-cases.module';
 import { RepositoriesModule } from './repositories.module';
 import { ServicesModule } from './services.module';
@@ -18,7 +22,7 @@ import { ServicesModule } from './services.module';
     RepositoriesModule,
     ServicesModule,
     MulterModule.register({
-      dest: './uploads',
+      storage: memoryStorage(),
     }),
   ],
   controllers: [
@@ -28,6 +32,9 @@ import { ServicesModule } from './services.module';
     DidsController,
     HcsController,
     HealthController,
+    FeedController,
+    LeaderboardController,
+    StatisticsController,
   ],
 })
 export class ControllersModule {}

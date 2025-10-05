@@ -26,8 +26,8 @@ export class Report {
   @Prop({ type: Object })
   detectionResult!: any;
 
-  @Prop({ type: String })
-  randomPrompt!: string;
+  @Prop({ type: Object })
+  randomPrompt!: any;
 
   @Prop({ type: Object })
   verificationResult?: any;
