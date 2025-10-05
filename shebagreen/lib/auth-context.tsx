@@ -1,7 +1,8 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
-import { mockFirebaseAuth } from "./firebase-mock"
+import { signUpUser, loginUser, logoutUser, getUserProfile, onAuthStateChange } from "./auth"
+import { auth } from "./firebase"
 import type { User } from "./types"
 
 interface AuthContextType {
@@ -21,39 +22,126 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check for existing user on mount
   useEffect(() => {
-    const currentUser = mockFirebaseAuth.getCurrentUser()
-    setUser(currentUser)
-    setLoading(false)
+    if (!auth) {
+      console.warn('Firebase Auth not available, using mock auth')
+      setLoading(false)
+      return
+    }
+
+    const unsubscribe = onAuthStateChange(async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const profile = await getUserProfile(firebaseUser.uid)
+          if (profile) {
+            setUser({
+              id: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              displayName: profile.username || firebaseUser.displayName || '',
+              photoURL: firebaseUser.photoURL || '',
+              ecoTokens: 0, // Default value, can be updated from Firestore
+              totalImpact: {
+                cleanups: 0,
+                trees: 0,
+                wasteCollected: 0
+              },
+              joinedAt: profile.createdAt || new Date().toISOString(),
+              level: 1
+            })
+          }
+        } catch (error) {
+          console.error('Failed to load user profile:', error)
+          // Still set user even if profile fetch fails
+          setUser({
+            id: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            displayName: firebaseUser.displayName || 'User',
+            photoURL: firebaseUser.photoURL || '',
+            ecoTokens: 0,
+            totalImpact: { cleanups: 0, trees: 0, wasteCollected: 0 },
+            joinedAt: new Date().toISOString(),
+            level: 1
+          })
+        }
+      } else {
+        setUser(null)
+      }
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
   }, [])
 
   const signIn = async (email: string, password: string) => {
-    const { user, error } = await mockFirebaseAuth.signIn(email, password)
-    if (user) {
-      setUser(user)
+    if (!auth) {
+      console.warn('Firebase Auth unavailable, using demo mode')
+      // Simulate successful login for demo purposes
+      setUser({
+        id: 'demo-user',
+        email: email,
+        displayName: 'Demo User',
+        photoURL: '',
+        ecoTokens: 100,
+        totalImpact: { cleanups: 5, trees: 10, wasteCollected: 25 },
+        joinedAt: new Date().toISOString(),
+        level: 2
+      })
       return {}
     }
-    return { error: error || "Failed to sign in" }
+
+    try {
+      await loginUser(email, password)
+      return {}
+    } catch (error: any) {
+      console.error('Sign in error:', error)
+      return { error: error.message || "Failed to sign in" }
+    }
   }
 
   const signUp = async (email: string, password: string, displayName: string) => {
-    const { user, error } = await mockFirebaseAuth.signUp(email, password, displayName)
-    if (user) {
-      setUser(user)
+    if (!auth) {
+      console.warn('Firebase Auth unavailable, using demo mode')
+      // Simulate successful signup for demo purposes
+      setUser({
+        id: 'demo-user',
+        email: email,
+        displayName: displayName,
+        photoURL: '',
+        ecoTokens: 50,
+        totalImpact: { cleanups: 0, trees: 0, wasteCollected: 0 },
+        joinedAt: new Date().toISOString(),
+        level: 1
+      })
       return {}
     }
-    return { error: error || "Failed to sign up" }
+
+    try {
+      await signUpUser(email, password, displayName)
+      return {}
+    } catch (error: any) {
+      console.error('Sign up error:', error)
+      return { error: error.message || "Failed to sign up" }
+    }
   }
 
   const signOut = async () => {
-    await mockFirebaseAuth.signOut()
-    setUser(null)
+    if (!auth) {
+      setUser(null)
+      return
+    }
+
+    try {
+      await logoutUser()
+    } catch (error) {
+      console.error('Sign out error:', error)
+      // Still clear local state even if Firebase logout fails
+      setUser(null)
+    }
   }
 
   const updateUser = async (updates: Partial<User>) => {
-    const { user: updatedUser } = await mockFirebaseAuth.updateProfile(updates)
-    if (updatedUser) {
-      setUser(updatedUser)
-    }
+    // For now, just log the updates. In a real app, you'd update Firestore
+    console.log('Update user:', updates)
+    // You could implement profile updates in Firestore here
   }
 
   return (
