@@ -139,9 +139,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const updateUser = async (updates: Partial<User>) => {
-    // For now, just log the updates. In a real app, you'd update Firestore
     console.log('Update user:', updates)
-    // You could implement profile updates in Firestore here
+    // Update local user state with the new data
+    setUser(prevUser => {
+      if (!prevUser) return null
+      return { ...prevUser, ...updates }
+    })
   }
 
   return (

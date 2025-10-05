@@ -12,6 +12,9 @@ export interface User {
   }
   joinedAt: string
   level: number
+  hederaAccountId?: string
+  evmAddress?: string
+  did?: string
 }
 
 // Event types

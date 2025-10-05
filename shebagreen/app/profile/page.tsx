@@ -9,19 +9,103 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { User, Mail, Calendar, Award, Leaf, Trash2, TrendingUp, LogOut, Edit, Save, X } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Label } from "@/components/ui/label"
+import { User, Mail, Calendar, Award, Leaf, Trash2, TrendingUp, LogOut, Edit, Save, X, AlertTriangle, CheckCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
+import { auth } from "@/lib/firebase"
 
 export default function ProfilePage() {
   const router = useRouter()
   const { user, signOut, updateUser } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [displayName, setDisplayName] = useState(user?.displayName || "")
+  const [showHederaDialog, setShowHederaDialog] = useState(false)
+  const [hederaAccountId, setHederaAccountId] = useState("")
+  const [evmAddress, setEvmAddress] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState("")
+
+  // Check if Hedera account is complete
+  const isHederaComplete = user?.hederaAccountId && user?.evmAddress
 
   const handleSave = async () => {
     if (displayName.trim()) {
       await updateUser({ displayName: displayName.trim() })
       setIsEditing(false)
+    }
+  }
+
+  const handleHederaSubmit = async () => {
+    if (!hederaAccountId.trim() || !evmAddress.trim()) {
+      setSubmitError("Please fill in both Hedera Account ID and EVM Address")
+      return
+    }
+
+    // Basic validation for Hedera Account ID format (0.0.xxxxx)
+    if (!/^0\.0\.\d+$/.test(hederaAccountId.trim())) {
+      setSubmitError("Invalid Hedera Account ID format. Should be like 0.0.123456")
+      return
+    }
+
+    // Basic validation for EVM address format
+    if (!/^0x[a-fA-F0-9]{40}$/.test(evmAddress.trim())) {
+      setSubmitError("Invalid EVM Address format. Should be a 42-character hexadecimal string starting with 0x")
+      return
+    }
+
+    setIsSubmitting(true)
+    setSubmitError("")
+
+    try {
+      // Get Firebase ID token
+      const currentUser = auth.currentUser
+      if (!currentUser) {
+        throw new Error("User not authenticated")
+      }
+
+      const idToken = await currentUser.getIdToken()
+
+      // Call the API endpoint
+      const response = await fetch('/api/v1/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          userId: user?.id,
+          displayName: user?.displayName,
+          hederaAccountId: hederaAccountId.trim(),
+          evmAddress: evmAddress.trim(),
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to update Hedera account')
+      }
+
+      const updatedUser = await response.json()
+      console.log('Hedera account linked successfully:', updatedUser)
+
+      // Update local user state
+      await updateUser({
+        hederaAccountId: updatedUser.hederaAccountId,
+        evmAddress: updatedUser.evmAddress,
+        did: updatedUser.did,
+      })
+
+      setShowHederaDialog(false)
+      setHederaAccountId("")
+      setEvmAddress("")
+
+    } catch (error: any) {
+      console.error('Hedera account update failed:', error)
+      setSubmitError(error.message || 'Failed to update Hedera account')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -44,6 +128,23 @@ export default function ProfilePage() {
               <h1 className="text-3xl font-bold font-heading mb-2">My Profile</h1>
               <p className="text-muted-foreground">Manage your account and view your achievements</p>
             </div>
+
+            {/* Hedera Account Warning */}
+            {!isHederaComplete && (
+              <Alert className="mb-6 border-orange-200 bg-orange-50">
+                <AlertTriangle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-orange-800">
+                  Your Hedera account setup is incomplete.{" "}
+                  <Button
+                    variant="link"
+                    className="p-0 h-auto text-orange-800 underline"
+                    onClick={() => setShowHederaDialog(true)}
+                  >
+                    Tap to complete.
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
 
             <div className="grid gap-6 lg:grid-cols-3">
               {/* Profile Card */}
@@ -239,6 +340,65 @@ export default function ProfilePage() {
           </div>
         </main>
       </div>
+
+      {/* Hedera Account Completion Dialog */}
+      <Dialog open={showHederaDialog} onOpenChange={setShowHederaDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Complete Your Hedera Account</DialogTitle>
+            <DialogDescription>
+              Link your Hedera account to enable decentralized features and earn rewards.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="hedera-account">Hedera Account ID</Label>
+              <Input
+                id="hedera-account"
+                placeholder="0.0.123456"
+                value={hederaAccountId}
+                onChange={(e) => setHederaAccountId(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Your Hedera account ID in the format 0.0.xxxxx
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="evm-address">EVM Address</Label>
+              <Input
+                id="evm-address"
+                placeholder="0x1234567890abcdef1234567890abcdef12345678"
+                value={evmAddress}
+                onChange={(e) => setEvmAddress(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Your EVM-compatible address for smart contract interactions
+              </p>
+            </div>
+            {submitError && (
+              <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                {submitError}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowHederaDialog(false)
+                setHederaAccountId("")
+                setEvmAddress("")
+                setSubmitError("")
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleHederaSubmit} disabled={isSubmitting}>
+              {isSubmitting ? "Linking..." : "Link Account"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ProtectedRoute>
   )
 }
